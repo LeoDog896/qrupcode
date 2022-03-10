@@ -2,6 +2,8 @@
 
 //! A CLI wrapper around qrcode as an alternative for qrencode
 
+mod write_image;
+
 use clap::{Args, Parser, Subcommand};
 use either::{Either, Left, Right};
 use image::{ImageBuffer, Luma};
@@ -9,10 +11,8 @@ use qrcode::QrCode;
 use qrcode::{render::unicode, EcLevel};
 use std::path::PathBuf;
 use qrcode::render::svg;
-
 use std::fs::write;
-
-mod write_image;
+use crate::write_image::{save_img_to_buffer, SpecificImageFormat};
 
 #[derive(Args, Clone)]
 struct BasicOutput {
@@ -90,6 +90,7 @@ fn main() {
 		QROutputType::Svg(_) => Left(
 			unrendered_qr_code.render()
 				.min_dimensions(200, 200)
+				.quiet_zone(args.quiet_zone)
 				.dark_color(svg::Color("#800000"))
 				.light_color(svg::Color("#ffff80"))
 				.build()

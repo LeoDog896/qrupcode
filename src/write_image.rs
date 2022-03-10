@@ -1,65 +1,69 @@
-use image::codecs::{bmp, farbfeld, gif, ico, jpeg, png, pnm, tga, tiff};
-use image::error::ImageFormatHint;
-use image::{ColorType, ImageEncoder, ImageError, ImageFormat, ImageResult};
-use std::{fs::File, io::BufWriter, path::Path};
+use image::codecs::{bmp, farbfeld, gif, ico, jpeg, png, pnm, tga};
+use image::{ColorType, ImageEncoder, ImageResult};
+use std::io::Write;
+use std::io::BufWriter;
+
+pub enum SpecificImageFormat {
+    Gif,
+    Ico,
+    Jpeg,
+    Png,
+    Pbm,
+    Pgm,
+    Ppm,
+    Pam,
+    Farbfeld,
+    Bmp,
+    Tga
+}
 
 // Most variables when no features are supported
-pub fn save_buffer_with_format_impl(
-    path: &Path,
+pub fn save_img_to_buffer<T: Write>(
+    fout: &mut BufWriter<T>,
     buf: &[u8],
     width: u32,
     height: u32,
     color: ColorType,
-    format: ImageFormat,
+    format: SpecificImageFormat,
 ) -> ImageResult<()> {
-    let fout = &mut BufWriter::new(File::create(path)?);
 
     match format {
-        image::ImageFormat::Gif => gif::GifEncoder::new(fout).encode(buf, width, height, color),
-        image::ImageFormat::Ico => {
+        SpecificImageFormat::Gif => gif::GifEncoder::new(fout).encode(buf, width, height, color),
+        SpecificImageFormat::Ico => {
             ico::IcoEncoder::new(fout).write_image(buf, width, height, color)
         }
-        image::ImageFormat::Jpeg => {
+        SpecificImageFormat::Jpeg => {
             jpeg::JpegEncoder::new(fout).write_image(buf, width, height, color)
         }
-        image::ImageFormat::Png => {
+        SpecificImageFormat::Png => {
             png::PngEncoder::new(fout).write_image(buf, width, height, color)
         }
-        image::ImageFormat::Pnm => {
-            let ext = path
-                .extension()
-                .and_then(|s| s.to_str())
-                .map_or("".to_string(), |s| s.to_ascii_lowercase());
-            match &*ext {
-                "pbm" => pnm::PnmEncoder::new(fout)
+        SpecificImageFormat::Pbm => {
+            pnm::PnmEncoder::new(fout)
                     .with_subtype(pnm::PNMSubtype::Bitmap(pnm::SampleEncoding::Binary))
-                    .write_image(buf, width, height, color),
-                "pgm" => pnm::PnmEncoder::new(fout)
-                    .with_subtype(pnm::PNMSubtype::Graymap(pnm::SampleEncoding::Binary))
-                    .write_image(buf, width, height, color),
-                "ppm" => pnm::PnmEncoder::new(fout)
-                    .with_subtype(pnm::PNMSubtype::Pixmap(pnm::SampleEncoding::Binary))
-                    .write_image(buf, width, height, color),
-                "pam" => pnm::PnmEncoder::new(fout).write_image(buf, width, height, color),
-                _ => Err(ImageError::Unsupported(
-                    ImageFormatHint::Exact(format).into(),
-                )), // Unsupported Pnm subtype.
-            }
+                    .write_image(buf, width, height, color)
         }
-        image::ImageFormat::Farbfeld => {
+        SpecificImageFormat::Pgm => {
+            pnm::PnmEncoder::new(fout)
+                    .with_subtype(pnm::PNMSubtype::Graymap(pnm::SampleEncoding::Binary))
+                    .write_image(buf, width, height, color)
+        }
+        SpecificImageFormat::Ppm => {
+            pnm::PnmEncoder::new(fout)
+                    .with_subtype(pnm::PNMSubtype::Pixmap(pnm::SampleEncoding::Binary))
+                    .write_image(buf, width, height, color)
+        },
+        SpecificImageFormat::Pam => {
+            pnm::PnmEncoder::new(fout).write_image(buf, width, height, color)
+        }
+        SpecificImageFormat::Farbfeld => {
             farbfeld::FarbfeldEncoder::new(fout).write_image(buf, width, height, color)
         }
-        image::ImageFormat::Bmp => {
+        SpecificImageFormat::Bmp => {
             bmp::BmpEncoder::new(fout).write_image(buf, width, height, color)
         }
-        image::ImageFormat::Tiff => {
-            tiff::TiffEncoder::new(fout).write_image(buf, width, height, color)
-        }
-        image::ImageFormat::Tga => {
+        SpecificImageFormat::Tga => {
             tga::TgaEncoder::new(fout).write_image(buf, width, height, color)
         }
-        format => Err(ImageError::Unsupported(
-            ImageFormatHint::Exact(format).into(),
-        )),
     }
 }
