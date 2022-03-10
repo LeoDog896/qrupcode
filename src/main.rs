@@ -2,13 +2,13 @@
 
 //! A CLI wrapper around qrcode as an alternative for qrencode
 
-use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 use either::{Either, Left, Right};
 use image::{ImageBuffer, Luma};
 use qrcode::QrCode;
 use qrcode::{render::unicode, EcLevel};
 use std::path::PathBuf;
+use qrcode::render::svg;
 
 use std::fs::write;
 
@@ -26,8 +26,10 @@ enum QROutputType {
     Unicode(BasicOutput),
     /// Print with ASCII (# and space)
     Ascii(BasicOutput),
-    // Print in the image format inferred by the file type.
+    /// Print in the image format inferred by the file type.
     Image(BasicOutput),
+	/// Print in SVG format (Scalable Vector Graphics)
+	Svg(BasicOutput)
 }
 
 /// A simple QR code generator.
@@ -50,16 +52,13 @@ struct Cli {
     output: Option<PathBuf>,
 }
 fn main() {
-    main_err().unwrap();
-}
-
-fn main_err() -> Result<()> {
     let args = Cli::parse();
 
     let options = match args.r#type.clone() {
         QROutputType::Ascii(options)
         | QROutputType::Unicode(options)
-        | QROutputType::Image(options) => options,
+        | QROutputType::Image(options)
+		| QROutputType::Svg(options) => options,
     };
 
     let unrendered_qr_code = QrCode::with_error_correction_level(options.content, EcLevel::M)
@@ -72,7 +71,7 @@ fn main_err() -> Result<()> {
                 .light_color(' ')
                 .dark_color('#')
                 .quiet_zone(args.quiet_zone)
-                .build(),
+                .build()
         ),
         QROutputType::Unicode(_) => Left(
             unrendered_qr_code
@@ -80,22 +79,32 @@ fn main_err() -> Result<()> {
                 .dark_color(unicode::Dense1x2::Light)
                 .light_color(unicode::Dense1x2::Dark)
                 .quiet_zone(args.quiet_zone)
-                .build(),
+                .build()
         ),
         QROutputType::Image(_) => Right(
             unrendered_qr_code
                 .render::<Luma<u8>>()
                 .quiet_zone(args.quiet_zone)
-                .build(),
+                .build()
         ),
+		QROutputType::Svg(_) => Left(
+			unrendered_qr_code.render()
+				.min_dimensions(200, 200)
+				.dark_color(svg::Color("#800000"))
+				.light_color(svg::Color("#ffff80"))
+				.build()
+		)
     };
 
     match args.output {
         Some(file) => {
             if let Right(image) = qr_code {
-                image.save(file.to_str().unwrap())?;
 
-                return Ok(());
+				let file_name = file.display().to_string();
+
+                image.save(&file_name).expect(&format!("Could not save image at {}.", &file_name));
+
+                return;
             }
 
             write(&file, qr_code.unwrap_left())
@@ -108,6 +117,4 @@ fn main_err() -> Result<()> {
             );
         }
     };
-
-    Ok(())
 }
